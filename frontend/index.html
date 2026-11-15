@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EPN FIS - WebChat Seguro (Firebase + JWT + WebSocket)</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Firebase SDKs (App, Authentication y Cloud Firestore) -->
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+</head>
+<body>
+    <div class="app-wrapper">
+        <main class="chat-container">
+            <!-- Encabezado del Chat -->
+            <header class="chat-header">
+                <div class="brand-info">
+                    <div class="avatar-group" aria-hidden="true">💬</div>
+                    <div class="header-text">
+                        <h1>EPN FIS WebChat</h1>
+                        <div class="meta-row">
+                            <span id="statusBadge" class="status-badge status-disconnected">
+                                <span class="status-dot"></span>
+                                <span id="statusText">Desconectado</span>
+                            </span>
+                            <span class="divider">•</span>
+                            <span id="onlineCounter" class="online-counter" title="Usuarios conectados">
+                                👥 <span id="onlineCountNum">0</span> en línea
+                            </span>
+                            <span class="divider">•</span>
+                            <span id="securityBadge" class="security-badge" title="Estado de Firebase y JWT">
+                                🔐 JWT
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="header-actions">
+                    <!-- Badge del usuario autenticado -->
+                    <div id="activeUserBar" class="active-user-bar hidden">
+                        <span class="active-user-tag">👤 <strong id="currentUsernameLabel"></strong></span>
+                        <button type="button" id="logoutBtn" class="btn-outline-sm" title="Cerrar sesión">
+                            Cerrar sesión
+                        </button>
+                    </div>
+
+                    <!-- Botón Modo Claro / Oscuro -->
+                    <button type="button" id="themeToggleBtn" class="theme-toggle-btn" aria-label="Cambiar entre modo claro y oscuro" title="Cambiar modo claro / oscuro">
+                        <span id="themeIcon">🌙</span>
+                        <span id="themeLabel" class="theme-label-text">Oscuro</span>
+                    </button>
+                </div>
+            </header>
+
+            <!-- PANTALLA DE LOGIN / REGISTRO (Firebase Authentication + JWT) -->
+            <section id="authOverlay" class="auth-overlay">
+                <div class="auth-card">
+                    <div class="auth-card-header">
+                        <div class="auth-logo">🔐</div>
+                        <h2 id="authTitle">Iniciar Sesión</h2>
+                        <p id="authSubtitle">Autenticación con Firebase Authentication + Token JWT</p>
+                        <div id="firebaseStatusBanner" class="firebase-status-banner">
+                            Cargando configuración desde <code>.env</code>...
+                        </div>
+                    </div>
+
+                    <!-- Pestañas Login / Registro -->
+                    <div class="auth-tabs">
+                        <button type="button" id="tabLoginBtn" class="auth-tab active">Iniciar Sesión</button>
+                        <button type="button" id="tabRegisterBtn" class="auth-tab">Registrarse</button>
+                    </div>
+
+                    <form id="authForm" class="auth-form" novalidate>
+                        <div id="usernameFieldGroup" class="form-group">
+                            <label for="authUsername">Nombre de usuario (visible en el chat)</label>
+                            <input
+                                type="text"
+                                id="authUsername"
+                                placeholder="Ej. Aleksei o Julián"
+                                maxlength="25"
+                                autocomplete="name"
+                            >
+                        </div>
+
+                        <div class="form-group">
+                            <label for="authEmail">Correo electrónico</label>
+                            <input
+                                type="email"
+                                id="authEmail"
+                                placeholder="usuario@epn.edu.ec"
+                                required
+                                autocomplete="email"
+                            >
+                        </div>
+
+                        <div class="form-group">
+                            <label for="authPassword">Contraseña</label>
+                            <input
+                                type="password"
+                                id="authPassword"
+                                placeholder="Mínimo 6 caracteres"
+                                required
+                                autocomplete="current-password"
+                            >
+                        </div>
+
+                        <div id="authErrorBox" class="auth-error-box hidden" role="alert"></div>
+
+                        <button type="submit" id="authSubmitBtn" class="btn-primary btn-full">
+                            Entrar al Chat
+                        </button>
+                    </form>
+                </div>
+            </section>
+
+            <!-- Área de mensajes tipo WhatsApp -->
+            <section id="messages" class="messages-area" aria-live="polite">
+                <div class="welcome-banner">
+                    🔒 Chat protegido con Firebase Authentication, persistencia en Cloud Firestore, validación de dominio y firma JWT.
+                </div>
+            </section>
+
+            <!-- Indicador "escribiendo..." -->
+            <div id="typingContainer" class="typing-container hidden" aria-live="polite">
+                <div class="typing-dots">
+                    <span></span><span></span><span></span>
+                </div>
+                <span id="typingText">Alguien está escribiendo...</span>
+            </div>
+
+            <!-- Alerta de validación (mensajes vacíos o demasiado largos) -->
+            <div id="validationAlert" class="validation-alert hidden" role="alert">
+                <span id="validationAlertText"></span>
+            </div>
+
+            <!-- Pie de envío de mensajes -->
+            <footer class="chat-footer">
+                <div class="input-wrapper">
+                    <input
+                        type="text"
+                        id="messageInput"
+                        placeholder="Escribe un mensaje..."
+                        autocomplete="off"
+                    >
+                    <span id="charCounter" class="char-counter">0 / 300</span>
+                </div>
+                <button type="button" id="sendBtn" class="send-btn" title="Enviar mensaje">
+                    <span>Enviar</span>
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+                        <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path>
+                    </svg>
+                </button>
+            </footer>
+        </main>
+    </div>
+
+    <script src="app.js?v=2" defer></script>
+</body>
+</html>
