@@ -14,7 +14,7 @@ const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '8h';
 const MAX_MESSAGE_LENGTH = 300;
 
 // Lista de dominios permitidos leídos desde el archivo .env
-const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000,http://127.0.0.1:3000')
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000,http://127.0.0.1:3000,https://labwebav-websocketchat.onrender.com')
   .split(',')
   .map((origin) => origin.trim())
   .filter(Boolean);
